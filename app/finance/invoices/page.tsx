@@ -703,8 +703,8 @@ function SummaryCards({ invoices }: { invoices: Invoice[] }) {
       ].map((item) => (
         <div key={item.label} className={clsx("rounded-xl border px-4 py-3", item.bg)}>
           <p className="text-xs font-medium text-gray-500">{item.label}</p>
-          <p className={clsx("text-lg font-bold tabular-nums mt-1", item.color)}>{formatCurrency(value => value, "USD").replace("NaN", "0")}
-            {formatCurrency(item.value)}
+          <p className={clsx("text-lg font-bold tabular-nums mt-1", item.color)}>
+            {formatCurrency(Number(item.value) || 0)}
           </p>
         </div>
       ))}
