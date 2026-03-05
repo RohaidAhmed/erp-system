@@ -7,6 +7,7 @@ import {
   LayoutDashboard, DollarSign, Users, Package, ShoppingCart,
   TrendingUp, Cog, BarChart3, ChevronRight, Building2, LogOut,
   FileText, Truck, UserCircle, Factory, ClipboardList,
+  ArrowRightLeft,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -36,6 +37,7 @@ const navItems = [
     children: [
       { label: "Products", href: "/inventory/products", icon: Package },
       { label: "Warehouses", href: "/inventory/warehouses", icon: Building2 },
+      { label: "Movements", href: "/inventory/movements", icon: ArrowRightLeft }
     ],
   },
   {
