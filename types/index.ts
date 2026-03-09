@@ -153,7 +153,7 @@ export interface Payroll extends AuditFields {
   tax_amount: number;
   net_salary: number;
   currency: Currency;
-  status: "draft" | "approved" | "disbursed";
+  status: "draft" | "approved" | "disbursed" | "voided";
   disbursed_at?: ISO8601;
   employee?: Pick<Employee, "id" | "full_name" | "employee_code">;
 }

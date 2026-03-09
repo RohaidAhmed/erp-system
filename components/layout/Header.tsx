@@ -1,6 +1,7 @@
 "use client";
 
 import { Bell, Search, Settings } from "lucide-react";
+import Link from "next/link";
 
 interface HeaderProps {
   title: string;
@@ -29,9 +30,9 @@ export default function Header({ title, subtitle, actions }: HeaderProps) {
           <Bell className="w-4 h-4" />
           <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-red-500" />
         </button>
-        <button className="p-2 rounded-lg hover:bg-surface-200 text-gray-500">
+        <Link href='/settings/users' className="p-2 rounded-lg hover:bg-surface-200 text-gray-500">
           <Settings className="w-4 h-4" />
-        </button>
+        </Link>
       </div>
     </header>
   );
