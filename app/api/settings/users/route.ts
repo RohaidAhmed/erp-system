@@ -64,7 +64,10 @@ export async function POST(req: NextRequest) {
         // Create auth user via admin API (invite)
         const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(
             body.email.toLowerCase().trim(),
-            { data: { full_name: body.full_name.trim() } }
+            {
+                data: { full_name: body.full_name.trim() },
+                redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?type=invite`,
+            }
         );
 
         if (authErr) return apiError(authErr.message);
