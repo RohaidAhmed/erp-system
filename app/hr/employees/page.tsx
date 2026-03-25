@@ -494,8 +494,9 @@ export default function EmployeesPage() {
   }, [statusFilter, deptFilter, search]);
 
   useEffect(() => {
-    fetch("/api/hr/departments?pageSize=100").then((r) => r.json()).then((res) => { if (res.success) setDepartments(res.data); });
+    fetch("/api/hr/departments").then((r) => r.json()).then((res) => { if (res.success) setDepartments(res.data); });
   }, []);
+  console.log("departments: ", departments);
   useEffect(() => { load(); }, [load]);
 
   const handleAdded   = (e: Employee) => { setEmployees((p) => [e, ...p]); setTotal((p) => p + 1); };
