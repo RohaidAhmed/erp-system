@@ -670,7 +670,7 @@ export default function AttendancePage() {
 
     useEffect(() => {
         Promise.all([
-            fetch("/api/hr/shifts").then((r) => r.json()),
+            fetch("/api/hr/attendance/shifts").then((r) => r.json()),
             fetch("/api/hr/departments?pageSize=100").then((r) => r.json()),
         ]).then(([sh, dp]) => {
             if (sh.success) setShifts(sh.data);
