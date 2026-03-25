@@ -366,6 +366,28 @@ function EditEmployeeDrawer({ employee: emp, onClose, onSuccess, departments, em
         body: JSON.stringify({ ...form.fields, salary: parseFloat(form.fields.salary), phone: form.fields.phone || undefined, manager_id: form.fields.manager_id || undefined }),
       });
       const data = await res.json();
+      if (photoUrl?.startsWith("blob:")) {
+        const blob = await fetch(photoUrl).then((r) => r.blob());
+        const file = new File(
+          [blob],
+          `photo.${blob.type.split("/")[1] || "jpg"}`,
+          { type: blob.type }
+        );
+
+        const fd = new FormData();
+        fd.append("photo", file);
+
+        const upRes = await fetch(`/api/hr/employees/${emp.id}/photo`, {
+          method: "POST", // ✅ IMPORTANT
+          body: fd,
+        });
+
+        const upData = await upRes.json();
+
+        if (upData.success) {
+          setPhotoUrl(upData.data.photo_url);
+        }
+      }
       if (data.success) { form.setSubmitStatus("success"); onSuccess({ ...data.data, photo_url: photoUrl }); setTimeout(onClose, 900); }
       else { form.setSubmitStatus("error"); form.setServerError(data.message || "Update failed."); }
     } catch { form.setSubmitStatus("error"); form.setServerError("Network error."); }
