@@ -44,7 +44,8 @@ export type UserRole =
   | "procurement_officer"
   | "sales_executive"
   | "production_manager"
-  | "viewer";
+  | "viewer"
+  | "employee";
 
 export interface User extends AuditFields {
   id: UUID;

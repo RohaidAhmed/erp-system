@@ -36,6 +36,9 @@ const RBAC: Record<UserRole, Partial<Record<Module, Permission[]>>> = {
     finance: ["view"], hr: [], inventory: ["view"],
     procurement: ["view"], sales: ["view"], production: ["view"], reporting: ["view"],
   },
+  employee: {
+    hr: ["view", "create", "edit", "delete"]
+  }
 };
 
 export function hasPermission(
@@ -69,6 +72,7 @@ export function getRoleLabel(role: UserRole): string {
     sales_executive: "Sales Executive",
     production_manager: "Production Manager",
     viewer: "Viewer",
+    employee: "Employee",
   };
   return labels[role] || role;
 }
