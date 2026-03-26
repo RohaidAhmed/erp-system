@@ -662,7 +662,7 @@ function DailyLog({ isManager, myEmployeeId, shifts, departments }: {
                                                         <td className="px-4 py-3 text-xs text-gray-600">{r.shifts?.name || "—"}</td>
                                                         <td className={clsx("px-4 py-3 text-xs tabular-nums font-medium", r.check_in ? "text-emerald-700" : "text-gray-300")}>{fmtTime(r.check_in)}</td>
                                                         <td className={clsx("px-4 py-3 text-xs tabular-nums font-medium", r.check_out ? "text-red-600" : "text-gray-300")}>{fmtTime(r.check_out)}</td>
-                                                        <td className="px-4 py-3 text-xs tabular-nums text-gray-700">{fmtMins(r.work_minutes)}</td>
+                                                        <td className="px-4 py-3 text-xs tabular-nums text-gray-700">{fmtMins(r.work_minutes - 60)}</td>
                                                         <td className="px-4 py-3 text-xs tabular-nums text-purple-700">{r.overtime_mins > 0 ? fmtMins(r.overtime_mins) : "—"}</td>
                                                         <td className="px-4 py-3">
                                                             <div className="flex flex-wrap gap-1">
