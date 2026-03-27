@@ -1,5 +1,6 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { apiError, apiServerError, apiSuccess, buildPagination, getPagination } from "@/lib/utils/api-response";
+import { dayCount } from "@/lib/utils/util";
 import { NextRequest } from "next/server";
 
 
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
 
         let query = supabase
             .from("leave_requests")
-            .select("*")
+            .select("*, employees(id, full_name, employee_code, photo_url, department_id, departments(name))")
             .order("employee_id", { ascending: true })
             .range(from, to);
 
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
         const supabase = createServerClient();
         const body = await req.json();
 
-        const required = ["employee_id", "leave_type", "start_date", "end_date", "days_count", "reason", "status"];
+        const required = ["employee_id", "leave_type", "start_date", "end_date", "reason"];
 
         for (const field of required) {
             if (!body[field]) {
@@ -54,11 +55,11 @@ export async function POST(req: NextRequest) {
             .insert({
                 employee_id: body.employee_id,
                 leave_type: body.leave_type,
-                start_data: body.start_date,
+                start_date: body.start_date,
                 end_date: body.end_date,
-                days_count: body.days_count,
                 reason: body.reason,
                 status: body.status,
+                days_count: dayCount(body.start_date, body.end_date),
             })
             .select("*")
             .single();
