@@ -41,6 +41,7 @@ interface FormFields {
   start_date: string;
   end_date: string;
   reason: string;
+  days_count: string;
 }
 interface FormErrors {
   employee_id?: string;
@@ -48,10 +49,11 @@ interface FormErrors {
   start_date?: string;
   end_date?: string;
   reason?: string;
+  days_count?: string;
 }
 
 const today = () => new Date().toISOString().split("T")[0];
-const EMPTY_FORM: FormFields = { employee_id: "", leave_type: "", start_date: today(), end_date: "", reason: "" };
+const EMPTY_FORM: FormFields = { employee_id: "", leave_type: "", start_date: today(), end_date: "", reason: "", days_count: "" };
 
 function validateLeave(f: FormFields): FormErrors {
   const e: FormErrors = {};
@@ -61,14 +63,16 @@ function validateLeave(f: FormFields): FormErrors {
   if (!f.end_date) e.end_date = "End date is required.";
   else if (f.end_date < f.start_date) e.end_date = "End date must be on or after start.";
   if (!f.reason?.trim()) e.reason = "Reason is required.";
+  if (!f.days_count) e.days_count = "Days count required";
   return e;
 }
 
 // ── Days count preview ─────────────────────────────────────────────────────────
 
-function DaysPreview({ start, end }: { start: string; end: string }) {
+function DaysPreview({ start, end, days_count }: { start: string; end: string; days_count: string }) {
   if (!start || !end || end < start) return null;
   const days = Math.ceil((new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  days_count = days.toString();
   return (
     <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand-50 border border-brand-200 text-xs">
       <Calendar className="w-3.5 h-3.5 text-brand-500" />
@@ -140,7 +144,7 @@ function LeaveForm({ fields, errors, set, employees, mode, firstRef, readOnly }:
           <FieldError message={errors.end_date} />
         </div>
       </div>
-      <DaysPreview start={fields.start_date} end={fields.end_date} />
+      <DaysPreview start={fields.start_date} end={fields.end_date} days_count={fields.days_count}/>
 
       {/* Reason */}
       <div>
@@ -230,6 +234,7 @@ function EditLeaveDrawer({ leave: lv, onClose, onSuccess, employees }: {
         start_date: lv.start_date.split("T")[0],
         end_date: lv.end_date.split("T")[0],
         reason: lv.reason,
+        days_count: lv.days_count.toString(),
       });
     }
   }, [lv]);

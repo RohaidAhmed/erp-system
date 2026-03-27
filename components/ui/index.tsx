@@ -170,7 +170,7 @@ export function SectionTitle({ title, count }: { title: string; count?: number }
 }
 
 // ---- Currency Formatter ----------------------------------
-export function formatCurrency(amount: number, currency = "USD"): string {
+export function formatCurrency(amount: number, currency = "PKR"): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,

@@ -13,6 +13,8 @@ import Header from "@/components/layout/Header";
 import { KPICard, PageWrapper, formatCurrency } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { clsx } from "clsx";
+// import PkrIcon from "@/components/ui/PkrIcon";
+import PakistaniRupeeIcon from "@/components/ui/PkrIcon";
 
 const COLORS = ["#6471f1", "#34d399", "#f59e0b", "#f87171", "#a78bfa", "#2dd4bf"];
 
@@ -54,7 +56,7 @@ export default function DashboardPage() {
 
   const stats = data?.stats;
   const kpiMetrics = stats ? [
-    { metric: stats.revenue, icon: DollarSign },
+    { metric: stats.revenue, icon: PakistaniRupeeIcon },
     { metric: stats.open_invoices, icon: FileText },
     { metric: stats.active_employees, icon: Users },
     { metric: stats.inventory_value, icon: Package },

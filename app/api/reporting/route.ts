@@ -53,10 +53,10 @@ export async function GET(req: NextRequest) {
     );
 
     const stats = {
-      revenue: { label: "Total Revenue", value: revenue, prefix: "$", trend: "up", change: 0 },
-      open_invoices: { label: "Open Invoices", value: openInvoices, prefix: "$", trend: "flat", change: 0 },
+      revenue: { label: "Total Revenue", value: revenue, prefix: "Rs.", trend: "up", change: 0 },
+      open_invoices: { label: "Open Invoices", value: openInvoices, prefix: "Rs.", trend: "flat", change: 0 },
       active_employees: { label: "Active Employees", value: employeeCount ?? 0, trend: "flat", change: 0 },
-      inventory_value: { label: "Inventory Value", value: inventoryValue, prefix: "$", trend: "flat", change: 0 },
+      inventory_value: { label: "Inventory Value", value: inventoryValue, prefix: "Rs.", trend: "flat", change: 0 },
       open_purchase_orders: { label: "Open POs", value: openPOCount ?? 0, trend: "flat", change: 0 },
       sales_pipeline: { label: "Open Sales Orders", value: openSOCount ?? 0, trend: "flat", change: 0 },
       production_orders: { label: "Active Work Orders", value: openWOCount ?? 0, trend: "flat", change: 0 },

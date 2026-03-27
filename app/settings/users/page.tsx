@@ -28,6 +28,7 @@ const ROLE_COLORS: Record<UserRole, string> = {
     sales_executive: "bg-brand-50 text-brand-700 border-brand-200",
     production_manager: "bg-orange-50 text-orange-700 border-orange-200",
     viewer: "bg-gray-100 text-gray-600 border-gray-200",
+    employee: "bg-gray-100 text-gray-600 border-gray-200",
 };
 
 function RoleBadge({ role }: { role: UserRole }) {
@@ -139,7 +140,7 @@ function InviteDrawer({ open, onClose, onSuccess }: {
                 <div className="p-3 rounded-lg bg-surface-100 border border-surface-300">
                     <p className="text-xs font-medium text-gray-700 mb-2">{getRoleLabel(role)} — module access</p>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                        {["Finance", "HR", "Inventory", "Procurement", "Sales", "Production", "Reporting"].map((mod) => {
+                        {["Finance", "HR", "Inventory", "Procurement", "Sales", "Production", "Reporting", "Employee"].map((mod) => {
                             const modKey = mod.toLowerCase().replace(" & crm", "").replace("human resources", "hr") as any;
                             const hasAccess = role === "super_admin" || role === `${modKey}_manager` || role === `${modKey}_officer` || role === `${modKey}_executive`;
                             return (

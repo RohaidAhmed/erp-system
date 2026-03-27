@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
-  Plus, RefreshCw, UserCircle, Pencil, Search,
-  UserX, UserCheck, UserMinus,
+  Plus, RefreshCw, Pencil, Search,
+  UserX, UserCheck, UserMinus, Camera, X, Loader2, Upload,
 } from "lucide-react";
 import Header from "@/components/layout/Header";
 import { PageWrapper, StatusBadge, TableSkeleton, EmptyState, SectionTitle, formatCurrency, formatDate } from "@/components/ui";
@@ -19,10 +19,123 @@ const CURRENCIES: Currency[] = ["USD", "EUR", "GBP", "PKR", "AED"];
 const EMPLOYMENT_TYPES: { value: EmploymentType; label: string }[] = [
   { value: "full_time", label: "Full Time" },
   { value: "part_time", label: "Part Time" },
-  { value: "contract", label: "Contract" },
-  { value: "intern", label: "Intern" },
+  { value: "contract",  label: "Contract"  },
+  { value: "intern",    label: "Intern"    },
 ];
 
+// ── Photo Upload Widget ────────────────────────────────────────────────────────
+function PhotoUpload({ employeeId, currentUrl, name, onUploaded, readOnly }: {
+  employeeId?: string;
+  currentUrl?: string | null;
+  name: string;
+  onUploaded?: (url: string | null) => void;
+  readOnly?: boolean;
+}) {
+  const [preview,   setPreview]   = useState<string | null>(currentUrl || null);
+  const [uploading, setUploading] = useState(false);
+  const [error,     setError]     = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setPreview(currentUrl || null); setError(""); }, [currentUrl]);
+
+  const initials = name
+    ? name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+    : "?";
+
+  const handleFile = async (file: File) => {
+    if (!file.type.startsWith("image/")) { setError("Please select an image file."); return; }
+    if (file.size > 5 * 1024 * 1024)    { setError("Image must be under 5 MB."); return; }
+    const localUrl = URL.createObjectURL(file);
+    setPreview(localUrl);
+    setError("");
+    if (!employeeId) { onUploaded?.(localUrl); return; }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("photo", file);
+      const res  = await fetch(`/api/hr/employees/${employeeId}/photo`, { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.success) { setPreview(data.data.photo_url); onUploaded?.(data.data.photo_url); }
+      else { setError(data.message || "Upload failed."); setPreview(currentUrl || null); }
+    } catch { setError("Network error during upload."); setPreview(currentUrl || null); }
+    finally { setUploading(false); }
+  };
+
+  const handleRemove = async () => {
+    if (!employeeId) { setPreview(null); onUploaded?.(null); return; }
+    setUploading(true);
+    try {
+      await fetch(`/api/hr/employees/${employeeId}/photo`, { method: "DELETE" });
+      setPreview(null); onUploaded?.(null);
+    } catch { setError("Failed to remove photo."); }
+    finally { setUploading(false); }
+  };
+
+  return (
+    <div className="flex items-start gap-4">
+      <div className="relative flex-shrink-0">
+        <div className={clsx(
+          "w-20 h-20 rounded-full border-2 overflow-hidden flex items-center justify-center",
+          preview ? "border-brand-300 bg-gray-100" : "border-dashed border-surface-400 bg-surface-100"
+        )}>
+          {preview
+            ? <img src={preview} alt={name} className="w-full h-full object-cover" />
+            : <span className="text-xl font-bold text-gray-400">{initials}</span>}
+          {uploading && (
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-full">
+              <Loader2 className="w-5 h-5 animate-spin text-white" />
+            </div>
+          )}
+        </div>
+        {!readOnly && !uploading && (
+          <button type="button" onClick={() => inputRef.current?.click()}
+            className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brand-600 hover:bg-brand-700 flex items-center justify-center shadow-md transition-colors"
+            title="Upload photo">
+            <Camera className="w-3.5 h-3.5 text-white" />
+          </button>
+        )}
+      </div>
+      <div className="flex-1 min-w-0 pt-1">
+        <p className="text-xs font-medium text-gray-700 mb-1">Profile Photo</p>
+        <p className="text-xs text-gray-400 mb-2">JPEG, PNG or WebP · max 5 MB</p>
+        {!readOnly && (
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-surface-200 hover:bg-surface-300 text-gray-700 transition-colors disabled:opacity-50">
+              <Upload className="w-3 h-3" />{preview ? "Change" : "Upload"}
+            </button>
+            {preview && (
+              <button type="button" onClick={handleRemove} disabled={uploading}
+                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50">
+                <X className="w-3 h-3" /> Remove
+              </button>
+            )}
+          </div>
+        )}
+        {error && <p className="mt-1.5 text-xs text-red-500">{error}</p>}
+      </div>
+      <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
+    </div>
+  );
+}
+
+// ── Employee avatar (table) ────────────────────────────────────────────────────
+function EmployeeAvatar({ emp }: { emp: Employee }) {
+  const initials = emp.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  return (
+    <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden",
+      emp.status === "active" ? "bg-brand-100" : emp.status === "on_leave" ? "bg-amber-100" : "bg-gray-100")}>
+      {(emp as any).photo_url
+        ? <img src={(emp as any).photo_url} alt={emp.full_name} className="w-full h-full object-cover" />
+        : <span className={clsx("text-xs font-bold",
+            emp.status === "active" ? "text-brand-700" : emp.status === "on_leave" ? "text-amber-700" : "text-gray-400"
+          )}>{initials}</span>}
+    </div>
+  );
+}
+
+// ── Form ───────────────────────────────────────────────────────────────────────
 interface FormFields {
   employee_code: string; full_name: string; email: string; phone: string;
   department_id: string; position: string; employment_type: EmploymentType;
@@ -32,15 +145,13 @@ interface FormErrors {
   employee_code?: string; full_name?: string; email?: string;
   department_id?: string; position?: string; salary?: string; hire_date?: string;
 }
-
 const today = () => new Date().toISOString().split("T")[0];
 const EMPTY_FORM: FormFields = {
   employee_code: "", full_name: "", email: "", phone: "",
   department_id: "", position: "", employment_type: "full_time",
   salary: "", currency: "USD", hire_date: today(), manager_id: "",
 };
-
-function validateForm(f: FormFields, mode: "add" | "edit"): FormErrors {
+function validateForm(f: FormFields, mode: "add"|"edit"): FormErrors {
   const e: FormErrors = {};
   if (mode === "add" && !f.employee_code.trim()) e.employee_code = "Required.";
   if (!f.full_name.trim()) e.full_name = "Full name is required.";
@@ -53,22 +164,21 @@ function validateForm(f: FormFields, mode: "add" | "edit"): FormErrors {
   if (!f.hire_date) e.hire_date = "Hire date is required.";
   return e;
 }
-
-function EmployeeForm({ fields, errors, set, departments, employees, mode, firstRef, readOnly }: {
-  fields: FormFields; errors: FormErrors;
-  set: (k: keyof FormFields, v: string) => void;
+function EmployeeFormFields({ fields, errors, set, departments, employees, mode, firstRef, readOnly }: {
+  fields: FormFields; errors: FormErrors; set: (k: keyof FormFields, v: string) => void;
   departments: Department[]; employees: Employee[];
-  mode: "add" | "edit"; firstRef?: React.Ref<HTMLInputElement>; readOnly?: boolean;
+  mode: "add"|"edit"; firstRef?: React.Ref<HTMLInputElement>; readOnly?: boolean;
 }) {
   const ro = (extra?: string) => clsx("input", extra, readOnly && "opacity-60 cursor-not-allowed");
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="label">Code {mode === "add" && <span className="text-red-500">*</span>}</label>
+          <label className="label">Code {mode==="add" && <span className="text-red-500">*</span>}</label>
           <input ref={firstRef} type="text" value={fields.employee_code} onChange={(e) => set("employee_code", e.target.value)}
-            placeholder="EMP-0042" disabled={readOnly || mode === "edit"} className={clsx("input font-mono", errors.employee_code && "border-red-400", (readOnly || mode === "edit") && "opacity-60 cursor-not-allowed bg-surface-200")} />
-          {mode === "edit" && !readOnly && <p className="mt-1 text-xs text-gray-400">Code cannot be changed.</p>}
+            placeholder="EMP-0042" disabled={readOnly || mode==="edit"}
+            className={clsx("input font-mono", errors.employee_code && "border-red-400", (readOnly||mode==="edit") && "opacity-60 cursor-not-allowed bg-surface-200")} />
+          {mode==="edit" && !readOnly && <p className="mt-1 text-xs text-gray-400">Code cannot be changed.</p>}
           <FieldError message={errors.employee_code} />
         </div>
         <div>
@@ -145,33 +255,30 @@ function EmployeeForm({ fields, errors, set, departments, employees, mode, first
     </div>
   );
 }
-
-function useDrawerForm(initial: FormFields, mode: "add" | "edit") {
-  const [fields, setFields] = useState<FormFields>(initial);
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle");
-  const [serverError, setServerError] = useState("");
-
-  const set = (k: keyof FormFields, v: string) => {
-    setFields((p) => ({ ...p, [k]: v }));
-    if (errors[k as keyof FormErrors]) setErrors((p) => ({ ...p, [k]: undefined }));
-  };
+function useDrawerForm(initial: FormFields) {
+  const [fields,       setFields]       = useState<FormFields>(initial);
+  const [errors,       setErrors]       = useState<FormErrors>({});
+  const [submitting,   setSubmitting]   = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<"idle"|"success"|"error">("idle");
+  const [serverError,  setServerError]  = useState("");
+  const set   = (k: keyof FormFields, v: string) => { setFields((p) => ({ ...p, [k]: v })); if (errors[k as keyof FormErrors]) setErrors((p) => ({ ...p, [k]: undefined })); };
   const reset = (f: FormFields) => { setFields(f); setErrors({}); setSubmitStatus("idle"); setServerError(""); };
   return { fields, errors, setErrors, set, reset, submitting, setSubmitting, submitStatus, setSubmitStatus, serverError, setServerError };
 }
 
+// ── Add Employee Drawer ────────────────────────────────────────────────────────
 function AddEmployeeDrawer({ open, onClose, onSuccess, departments, employees }: {
   open: boolean; onClose: () => void; onSuccess: (e: Employee) => void;
   departments: Department[]; employees: Employee[];
 }) {
-  const { can } = useAuth();
+  const { can }   = useAuth();
   const canCreate = can.create("hr");
-  const form = useDrawerForm(EMPTY_FORM, "add");
-  const firstRef = useRef<HTMLInputElement>(null);
+  const form      = useDrawerForm(EMPTY_FORM);
+  const firstRef  = useRef<HTMLInputElement>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) { form.reset({ ...EMPTY_FORM, hire_date: today() }); setTimeout(() => firstRef.current?.focus(), 120); }
+    if (open) { form.reset({ ...EMPTY_FORM, hire_date: today() }); setPhotoPreview(null); setTimeout(() => firstRef.current?.focus(), 120); }
   }, [open]);
 
   const handleSubmit = async () => {
@@ -179,13 +286,23 @@ function AddEmployeeDrawer({ open, onClose, onSuccess, departments, employees }:
     if (Object.keys(errs).length) { form.setErrors(errs); return; }
     form.setSubmitting(true); form.setServerError("");
     try {
-      const res = await fetch("/api/hr/employees", {
+      const res  = await fetch("/api/hr/employees", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form.fields, salary: parseFloat(form.fields.salary), phone: form.fields.phone || undefined, manager_id: form.fields.manager_id || undefined }),
       });
       const data = await res.json();
-      if (data.success) { form.setSubmitStatus("success"); onSuccess(data.data); setTimeout(onClose, 900); }
-      else { form.setSubmitStatus("error"); form.setServerError(data.message || "Failed."); }
+      if (!data.success) { form.setSubmitStatus("error"); form.setServerError(data.message || "Failed."); return; }
+      let employee = data.data;
+      // Upload pending photo if selected before save
+      if (photoPreview?.startsWith("blob:")) {
+        const blob = await fetch(photoPreview).then((r) => r.blob());
+        const file = new File([blob], `photo.${blob.type.split("/")[1]||"jpg"}`, { type: blob.type });
+        const fd   = new FormData(); fd.append("photo", file);
+        const upRes  = await fetch(`/api/hr/employees/${employee.id}/photo`, { method: "POST", body: fd });
+        const upData = await upRes.json();
+        if (upData.success) employee = { ...employee, photo_url: upData.data.photo_url };
+      }
+      form.setSubmitStatus("success"); onSuccess(employee); setTimeout(onClose, 900);
     } catch { form.setSubmitStatus("error"); form.setServerError("Network error."); }
     finally { form.setSubmitting(false); }
   };
@@ -193,26 +310,35 @@ function AddEmployeeDrawer({ open, onClose, onSuccess, departments, employees }:
   return (
     <Drawer open={open} onClose={onClose} title="Add Employee" subtitle="Create a new employee record" breadcrumb="New Employee">
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-        {!canCreate ? <AccessDeniedBanner action="create employees" role="HR Manager" /> :
-          <EmployeeForm fields={form.fields} errors={form.errors} set={form.set} departments={departments} employees={employees} mode="add" firstRef={firstRef} />}
+        {!canCreate ? <AccessDeniedBanner action="create employees" role="HR Manager" /> : (
+          <>
+            <PhotoUpload name={form.fields.full_name || "New Employee"} currentUrl={photoPreview} onUploaded={setPhotoPreview} />
+            <div className="border-t border-surface-200 pt-5">
+              <EmployeeFormFields fields={form.fields} errors={form.errors} set={form.set}
+                departments={departments} employees={employees} mode="add" firstRef={firstRef} />
+            </div>
+          </>
+        )}
         {form.serverError && <ErrorBanner message={form.serverError} />}
         {form.submitStatus === "success" && <SuccessBanner message="Employee added successfully!" />}
       </div>
-      <DrawerFooter onCancel={onClose} onSubmit={handleSubmit} submitting={form.submitting} success={form.submitStatus === "success"} submitLabel="Add Employee" disabled={!canCreate} />
+      <DrawerFooter onCancel={onClose} onSubmit={handleSubmit} submitting={form.submitting} success={form.submitStatus==="success"} submitLabel="Add Employee" disabled={!canCreate} />
     </Drawer>
   );
 }
 
+// ── Edit Employee Drawer ───────────────────────────────────────────────────────
 function EditEmployeeDrawer({ employee: emp, onClose, onSuccess, departments, employees }: {
   employee: Employee | null; onClose: () => void; onSuccess: (e: Employee) => void;
   departments: Department[]; employees: Employee[];
 }) {
   const open = !!emp;
-  const { can } = useAuth();
-  const canEdit = can.edit("hr");
+  const { can }      = useAuth();
+  const canEdit      = can.edit("hr");
   const canTerminate = can.full("hr");
-  const form = useDrawerForm(EMPTY_FORM, "edit");
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const form         = useDrawerForm(EMPTY_FORM);
+  const [photoUrl,         setPhotoUrl]         = useState<string | null>(null);
+  const [actionLoading,    setActionLoading]    = useState<string | null>(null);
   const [confirmTerminate, setConfirmTerminate] = useState(false);
 
   useEffect(() => {
@@ -223,6 +349,7 @@ function EditEmployeeDrawer({ employee: emp, onClose, onSuccess, departments, em
         employment_type: emp.employment_type, salary: String(emp.salary),
         currency: emp.currency, hire_date: emp.hire_date.split("T")[0], manager_id: emp.manager_id || "",
       });
+      setPhotoUrl((emp as any).photo_url || null);
       setConfirmTerminate(false);
     }
   }, [emp]);
@@ -234,12 +361,12 @@ function EditEmployeeDrawer({ employee: emp, onClose, onSuccess, departments, em
     if (Object.keys(errs).length || !emp) { form.setErrors(errs); return; }
     form.setSubmitting(true); form.setServerError("");
     try {
-      const res = await fetch(`/api/hr/employees/${emp.id}`, {
+      const res  = await fetch(`/api/hr/employees/${emp.id}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form.fields, salary: parseFloat(form.fields.salary), phone: form.fields.phone || undefined, manager_id: form.fields.manager_id || undefined }),
       });
       const data = await res.json();
-      if (data.success) { form.setSubmitStatus("success"); onSuccess(data.data); setTimeout(onClose, 900); }
+      if (data.success) { form.setSubmitStatus("success"); onSuccess({ ...data.data, photo_url: photoUrl }); setTimeout(onClose, 900); }
       else { form.setSubmitStatus("error"); form.setServerError(data.message || "Update failed."); }
     } catch { form.setSubmitStatus("error"); form.setServerError("Network error."); }
     finally { form.setSubmitting(false); }
@@ -249,14 +376,13 @@ function EditEmployeeDrawer({ employee: emp, onClose, onSuccess, departments, em
     if (!emp) return;
     setActionLoading(status); form.setServerError("");
     try {
-      const res = await fetch(`/api/hr/employees/${emp.id}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
+      const res  = await fetch(`/api/hr/employees/${emp.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
       const data = await res.json();
-      if (data.success) { onSuccess(data.data); setTimeout(onClose, 300); }
+      if (data.success) { onSuccess({ ...data.data, photo_url: photoUrl }); setTimeout(onClose, 300); }
       else form.setServerError(data.message || "Status change failed.");
-    } catch { form.setServerError("Network error."); }
+    } catch(error) { form.setServerError("Network error."); 
+      console.log("status error: ", (error as Error).message)
+    }
     finally { setActionLoading(null); setConfirmTerminate(false); }
   };
 
@@ -265,18 +391,18 @@ function EditEmployeeDrawer({ employee: emp, onClose, onSuccess, departments, em
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
         {emp && (
           <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-surface-100 border border-surface-300">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-medium text-gray-600">Status:</span>
-              <StatusBadge status={emp.status} />
-            </div>
+            <div className="flex items-center gap-2 text-xs"><span className="font-medium text-gray-600">Status:</span><StatusBadge status={emp.status} /></div>
             {!isEditable && <span className="text-xs text-gray-400">Record is read-only</span>}
           </div>
         )}
         {!canEdit && isEditable && <AccessDeniedBanner action="edit employees" role="HR Manager" />}
-        <EmployeeForm fields={form.fields} errors={form.errors} set={form.set}
-          departments={departments} employees={employees.filter((e) => e.id !== emp?.id)}
-          mode="edit" readOnly={!canEdit || !isEditable} />
-
+        <PhotoUpload employeeId={emp?.id} currentUrl={photoUrl} name={emp?.full_name || "Employee"}
+          onUploaded={setPhotoUrl} readOnly={!canEdit || !isEditable} />
+        <div className="border-t border-surface-200 pt-5">
+          <EmployeeFormFields fields={form.fields} errors={form.errors} set={form.set}
+            departments={departments} employees={employees.filter((e) => e.id !== emp?.id)}
+            mode="edit" readOnly={!canEdit || !isEditable} />
+        </div>
         {emp && emp.status !== "terminated" && (
           <div className="pt-2 border-t border-surface-300 space-y-2">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Status Actions</p>
@@ -315,29 +441,30 @@ function EditEmployeeDrawer({ employee: emp, onClose, onSuccess, departments, em
         {form.submitStatus === "success" && <SuccessBanner message="Employee updated!" />}
       </div>
       <DrawerFooter onCancel={onClose} onSubmit={handleSave} submitting={form.submitting}
-        success={form.submitStatus === "success"} submitLabel="Save Changes" disabled={!canEdit || !isEditable} />
+        success={form.submitStatus==="success"} submitLabel="Save Changes" disabled={!canEdit || !isEditable} />
     </Drawer>
   );
 }
 
+// ── Main Page ──────────────────────────────────────────────────────────────────
 export default function EmployeesPage() {
   const { can, user, loading: authLoading } = useAuth();
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-  const [addOpen, setAddOpen] = useState(false);
+  const [employees,    setEmployees]    = useState<Employee[]>([]);
+  const [departments,  setDepartments]  = useState<Department[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [total,        setTotal]        = useState(0);
+  const [addOpen,      setAddOpen]      = useState(false);
   const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
-  const [search, setSearch] = useState("");
+  const [search,       setSearch]       = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [deptFilter, setDeptFilter] = useState("");
+  const [deptFilter,   setDeptFilter]   = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
     const p = new URLSearchParams({ pageSize: "100" });
-    if (statusFilter) p.set("status", statusFilter);
-    if (deptFilter) p.set("department_id", deptFilter);
-    if (search) p.set("search", search);
+    if (statusFilter) p.set("status",        statusFilter);
+    if (deptFilter)   p.set("department_id", deptFilter);
+    if (search)       p.set("search",        search);
     fetch(`/api/hr/employees?${p}`)
       .then((r) => r.json())
       .then((res) => { if (res.success) { setEmployees(res.data); setTotal(res.pagination?.totalCount || 0); } })
@@ -345,11 +472,12 @@ export default function EmployeesPage() {
   }, [statusFilter, deptFilter, search]);
 
   useEffect(() => {
-    fetch("/api/hr/departments?pageSize=100").then((r) => r.json()).then((res) => { if (res.success) setDepartments(res.data); });
+    fetch("/api/hr/departments").then((r) => r.json()).then((res) => { if (res.success) setDepartments(res.data); });
   }, []);
+  console.log("departments: ", departments);
   useEffect(() => { load(); }, [load]);
 
-  const handleAdded = (e: Employee) => { setEmployees((p) => [e, ...p]); setTotal((p) => p + 1); };
+  const handleAdded   = (e: Employee) => { setEmployees((p) => [e, ...p]); setTotal((p) => p + 1); };
   const handleUpdated = (e: Employee) => { setEmployees((p) => p.map((x) => x.id === e.id ? e : x)); };
 
   const counts = { active: 0, on_leave: 0, terminated: 0 };
@@ -368,14 +496,17 @@ export default function EmployeesPage() {
       <PageWrapper>
         {!authLoading && user && (
           <AuthStrip userName={user.full_name} userRole={user.role} permissions={[
-            { label: "Add", allowed: can.create("hr") },
-            { label: "Edit", allowed: can.edit("hr") },
+            { label: "Add",       allowed: can.create("hr") },
+            { label: "Edit",      allowed: can.edit("hr") },
             { label: "Terminate", allowed: can.full("hr") },
           ]} />
         )}
         {!loading && (
           <div className="grid grid-cols-3 gap-3 mb-4">
-            {([["Active", counts.active, "text-emerald-700", "bg-emerald-50 border-emerald-200"], ["On Leave", counts.on_leave, "text-amber-700", "bg-amber-50 border-amber-200"], ["Terminated", counts.terminated, "text-red-600", "bg-red-50 border-red-200"]] as const).map(([label, value, color, bg]) => (
+            {([ ["Active", counts.active, "text-emerald-700", "bg-emerald-50 border-emerald-200"],
+                ["On Leave", counts.on_leave, "text-amber-700", "bg-amber-50 border-amber-200"],
+                ["Terminated", counts.terminated, "text-red-600", "bg-red-50 border-red-200"] ] as const)
+              .map(([label, value, color, bg]) => (
               <div key={label} className={clsx("rounded-xl border px-4 py-3 flex items-center justify-between", bg)}>
                 <span className="text-xs font-medium text-gray-500">{label}</span>
                 <span className={clsx("text-2xl font-bold", color)}>{value}</span>
@@ -405,38 +536,39 @@ export default function EmployeesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-surface-200 bg-surface-100">
-                  {["Employee", "Code", "Department", "Position", "Type", "Salary", "Hired", "Status", ""].map((h) => (
-                    <th key={h} className={clsx("table-header px-4 py-3", h === "Salary" ? "text-right" : "text-left")}>{h}</th>
+                  {["Employee","Code","Department","Position","Type","Salary","Hired","Status",""].map((h) => (
+                    <th key={h} className={clsx("table-header px-4 py-3", h==="Salary" ? "text-right" : "text-left")}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {loading ? <tr><td colSpan={9}><TableSkeleton rows={8} cols={9} /></td></tr>
-                  : employees.length === 0 ? <tr><td colSpan={9}><EmptyState title="No employees found" description="Add your first employee to get started." action={can.create("hr") ? <button onClick={() => setAddOpen(true)} className="btn-primary"><Plus className="w-3.5 h-3.5" /> Add Employee</button> : undefined} /></td></tr>
-                    : employees.map((emp) => (
-                      <tr key={emp.id} onClick={() => setEditEmployee(emp)} className="border-b border-surface-200 hover:bg-surface-50 transition-colors cursor-pointer group">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2.5">
-                            <div className={clsx("w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0",
-                              emp.status === "active" ? "bg-brand-100" : emp.status === "on_leave" ? "bg-amber-100" : "bg-gray-100")}>
-                              <UserCircle className={clsx("w-4 h-4", emp.status === "active" ? "text-brand-600" : emp.status === "on_leave" ? "text-amber-600" : "text-gray-400")} />
-                            </div>
-                            <div>
-                              <p className="font-medium text-gray-900 text-sm">{emp.full_name}</p>
-                              <p className="text-xs text-gray-500">{emp.email}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs text-gray-600">{emp.employee_code}</td>
-                        <td className="px-4 py-3 text-gray-700">{(emp as any).departments?.name || "—"}</td>
-                        <td className="px-4 py-3 text-gray-700">{emp.position}</td>
-                        <td className="px-4 py-3 text-xs text-gray-600 capitalize">{emp.employment_type.replace("_", " ")}</td>
-                        <td className="px-4 py-3 text-right font-medium tabular-nums">{formatCurrency(emp.salary, emp.currency)}</td>
-                        <td className="px-4 py-3 text-gray-600">{formatDate(emp.hire_date)}</td>
-                        <td className="px-4 py-3"><StatusBadge status={emp.status} /></td>
-                        <td className="px-4 py-3"><Pencil className="w-3.5 h-3.5 text-gray-300 group-hover:text-brand-500 transition-colors" /></td>
-                      </tr>
-                    ))}
+                 : employees.length === 0 ? (
+                  <tr><td colSpan={9}>
+                    <EmptyState title="No employees found" description="Add your first employee to get started."
+                      action={can.create("hr") ? <button onClick={() => setAddOpen(true)} className="btn-primary"><Plus className="w-3.5 h-3.5" /> Add Employee</button> : undefined} />
+                  </td></tr>
+                 ) : employees.map((emp) => (
+                  <tr key={emp.id} onClick={() => setEditEmployee(emp)} className="border-b border-surface-200 hover:bg-surface-50 transition-colors cursor-pointer group">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <EmployeeAvatar emp={emp} />
+                        <div>
+                          <p className="font-medium text-gray-900 text-sm">{emp.full_name}</p>
+                          <p className="text-xs text-gray-500">{emp.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-600">{emp.employee_code}</td>
+                    <td className="px-4 py-3 text-gray-700">{(emp as any).departments?.name || "—"}</td>
+                    <td className="px-4 py-3 text-gray-700">{emp.position}</td>
+                    <td className="px-4 py-3 text-xs text-gray-600 capitalize">{emp.employment_type.replace("_"," ")}</td>
+                    <td className="px-4 py-3 text-right font-medium tabular-nums">{formatCurrency(emp.salary, emp.currency)}</td>
+                    <td className="px-4 py-3 text-gray-600">{formatDate(emp.hire_date)}</td>
+                    <td className="px-4 py-3"><StatusBadge status={emp.status} /></td>
+                    <td className="px-4 py-3"><Pencil className="w-3.5 h-3.5 text-gray-300 group-hover:text-brand-500 transition-colors" /></td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
