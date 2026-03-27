@@ -466,7 +466,9 @@ function SyncPanel({ onSynced }: { onSynced: () => void }) {
                 setLogs((prev) => [data.data, ...prev].slice(0, 10));
                 onSynced();
             }
-        } catch { }
+        } catch (error) {
+            console.log((error as Error).message)
+        }
         finally { setSyncing(false); }
     };
 
