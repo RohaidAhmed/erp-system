@@ -110,14 +110,14 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
         // ── Notify on edit ────────────────────────────────────────────────────
         const emp = (data as any).employees;
-        if (emp) {
-            notifyLeaveAction(db, emp, fullName!, "leave_edit", {
-                "Leave Type": leave_type.replace("_", " "),
-                "New Dates": `${start_date} → ${end_date} (${days_count} day${days_count > 1 ? "s" : ""})`,
-                "Reason": reason.trim(),
-                "Changed From": `${(existing as any).leave_type} · ${(existing as any).start_date} → ${(existing as any).end_date}`,
-            }).catch(console.error);
-        }
+        // if (emp) {
+        //     notifyLeaveAction(db, emp, fullName!, "leave_edit", {
+        //         "Leave Type": leave_type.replace("_", " "),
+        //         "New Dates": `${start_date} → ${end_date} (${days_count} day${days_count > 1 ? "s" : ""})`,
+        //         "Reason": reason.trim(),
+        //         "Changed From": `${(existing as any).leave_type} · ${(existing as any).start_date} → ${(existing as any).end_date}`,
+        //     }).catch(console.error);
+        // }
 
         return apiSuccess(data, "Leave request updated.");
     } catch (err) { return apiServerError(err); }
