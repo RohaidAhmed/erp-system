@@ -53,6 +53,7 @@ interface FormFields {
   start_date: string;
   end_date: string;
   reason: string;
+  days_count: string;
 }
 interface FormErrors {
   employee_id?: string; leave_type?: string;
@@ -67,12 +68,25 @@ function validate(f: FormFields, isEmployee: boolean): FormErrors {
   if (!f.end_date) e.end_date = "End date is required.";
   else if (f.end_date < f.start_date) e.end_date = "End must be on or after start.";
   if (!f.reason?.trim()) e.reason = "Reason is required.";
+  if (!f.days_count) e.days_count = "Days count required";
   return e;
 }
 
 function dayCount(s: string, e: string): number {
   if (!s || !e || e < s) return 0;
   return Math.ceil((new Date(e).getTime() - new Date(s).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+// ── Days count preview ─────────────────────────────────────────────────────────
+
+function DaysPreview({ start, end, days_count }: { start: string; end: string; days_count: string }) {
+  if (!start || !end || end < start) return null;
+  const days = Math.ceil((new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  days_count = days.toString();
+  return (
+    <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand-50 border border-brand-200 text-xs">
+      <Calendar className="w-3.5 h-3.5 text-brand-500" />
+      <span className="text-brand-700 font-medium">{days} day{days !== 1 ? "s" : ""} of leave</span>
+    </div>
+  );
 }
 
 // ── Add / Edit drawer ─────────────────────────────────────────────────────────
