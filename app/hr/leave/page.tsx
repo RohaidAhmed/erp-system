@@ -57,7 +57,7 @@ interface FormFields {
 }
 interface FormErrors {
   employee_id?: string; leave_type?: string;
-  start_date?: string; end_date?: string; reason?: string;
+  start_date?: string; end_date?: string; reason?: string; days_count?: string;
 }
 
 function validate(f: FormFields, isEmployee: boolean): FormErrors {
@@ -75,6 +75,7 @@ function validate(f: FormFields, isEmployee: boolean): FormErrors {
 function dayCount(s: string, e: string): number {
   if (!s || !e || e < s) return 0;
   return Math.ceil((new Date(e).getTime() - new Date(s).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+}
 // ── Days count preview ─────────────────────────────────────────────────────────
 
 function DaysPreview({ start, end, days_count }: { start: string; end: string; days_count: string }) {
@@ -106,6 +107,7 @@ function LeaveDrawer({ open, mode, request, isEmployee, myEmployeeId, employees,
     start_date: today(),
     end_date: today(),
     reason: "",
+    days_count: ""
   };
 
   const [fields, setFields] = useState<FormFields>(EMPTY);
@@ -124,6 +126,7 @@ function LeaveDrawer({ open, mode, request, isEmployee, myEmployeeId, employees,
           start_date: request.start_date,
           end_date: request.end_date,
           reason: request.reason,
+          days_count: String(request.days_count)
         });
       } else {
         setFields({ ...EMPTY, employee_id: isEmployee ? (myEmployeeId || "") : "" });
