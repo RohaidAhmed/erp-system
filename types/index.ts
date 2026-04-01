@@ -170,8 +170,33 @@ export interface LeaveRequest extends AuditFields {
   status: LeaveStatus;
   approved_by?: UUID;
   approved_at?: ISO8601;
-  employee?: Pick<Employee, "id" | "full_name" | "department_id">;
+  employees?: {
+    id: UUID;
+    full_name: string;
+    employee_code: string;
+    department_id: UUID;
+    departments?: {
+      name: string;
+    };
+  };
 }
+
+
+// export interface LeaveRequest extends AuditFields {
+//   id: UUID;
+//   employee_id: UUID;
+//   leave_type: LeaveType;
+//   start_date: ISO8601;
+//   end_date: ISO8601;
+//   days_count: number;
+//   reason: string;
+//   status: LeaveStatus;
+//   approved_by?: UUID;
+//   approved_at?: ISO8601;
+//   employee?: Pick<Employee, "id" | "full_name" | "department_id" | "employee_code"> & {
+//     departments?: Pick<Department, "name">;
+//   };
+// }
 
 // ---- Inventory Module --------------------------------------
 export type StockMovementType = "inbound" | "outbound" | "transfer" | "adjustment";

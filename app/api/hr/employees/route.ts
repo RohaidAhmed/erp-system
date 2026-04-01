@@ -22,7 +22,17 @@ export async function GET(req: NextRequest) {
 
     if (status) query = query.eq("status", status);
     if (department_id) query = query.eq("department_id", department_id);
-    if (search) query = query.ilike("full_name", `%${search}%`);
+    if (search) {
+      // If search looks like an email, match exactly on email
+      const isEmail =
+        search.includes("@") && search.includes(".");
+
+      if (isEmail) {
+        query = query.eq("email", search);
+      } else {
+        query = query.ilike("full_name", `%${search}%`);
+      }
+    }
 
     const { data, error, count } = await query;
     if (error) return apiError(error.message);

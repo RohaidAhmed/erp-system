@@ -2,3 +2,7 @@ node_modules/
 .next/
 .env*
 .venv/*
+to_claud/
+scripts/
+.venv/
+.vscode/
