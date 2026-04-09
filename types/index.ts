@@ -111,6 +111,7 @@ export interface Invoice extends AuditFields {
   paid_date?: ISO8601;
   notes?: string;
   customer?: Customer;
+  photo_url?: string;
 }
 
 // ---- HR Module ---------------------------------------------

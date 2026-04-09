@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Plus, RefreshCw, X, ChevronRight, AlertCircle, CheckCircle2,
   Loader2, Pencil, Ban, Send, ThumbsUp, DollarSign,
-  Search, FileText, Lock,
+  Search, FileText, Lock, Camera, Upload,
 } from "lucide-react";
 import Header from "@/components/layout/Header";
 import {
@@ -24,15 +24,12 @@ const INVOICE_TYPES = [
   { value: "accounts_payable", label: "Accounts Payable (AP)", description: "Money you owe to suppliers" },
 ];
 
-/** Which statuses can be manually moved to, and who can do it */
 const STATUS_ACTIONS: {
   status: InvoiceStatus;
   label: string;
   icon: React.ElementType;
   color: string;
-  /** from statuses this action is available on */
   from: InvoiceStatus[];
-  /** permission check key */
   perm: "canCreate" | "canEdit" | "canApprove" | "canVoid";
 }[] = [
     { status: "sent", label: "Mark as Sent", icon: Send, color: "text-blue-600", from: ["draft"], perm: "canEdit" },
@@ -68,9 +65,145 @@ interface FormErrors {
 const today = () => new Date().toISOString().split("T")[0];
 const EMPTY_FORM: FormFields = {
   invoice_number: "", type: "", amount: "", tax_amount: "0",
-  currency: "USD", issue_date: today(), due_date: "", customer_id: "",
-  supplier_id: "", notes: "",
+  currency: "USD", issue_date: today(), due_date: "",
+  customer_id: "", supplier_id: "", notes: "",
 };
+
+// ── Photo Upload Widget ────────────────────────────────────────────────────────
+
+function PhotoUpload({ invoiceId, currentUrl, name, onUploaded, readOnly }: {
+  invoiceId?: string;
+  currentUrl?: string | null;
+  name: string;
+  onUploaded?: (url: string | null) => void;
+  readOnly?: boolean;
+}) {
+  const [preview, setPreview] = useState<string | null>(currentUrl || null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setPreview(currentUrl || null); setError(""); }, [currentUrl]);
+
+  const initials = name
+    ? name.replace(/[^a-zA-Z0-9\-]/g, "").slice(0, 2).toUpperCase()
+    : "INV";
+
+  const handleFile = async (file: File) => {
+    if (!file.type.startsWith("image/")) { setError("Please select an image file."); return; }
+    if (file.size > 5 * 1024 * 1024) { setError("Image must be under 5 MB."); return; }
+    const localUrl = URL.createObjectURL(file);
+    setPreview(localUrl);
+    setError("");
+    // If no invoiceId yet (Add drawer), just hold the blob preview for upload-after-create
+    if (!invoiceId) { onUploaded?.(localUrl); return; }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("photo", file);
+      const res = await fetch(`/api/finance/invoices/${invoiceId}/photo`, { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.success) { setPreview(data.data.photo_url); onUploaded?.(data.data.photo_url); }
+      else { setError(data.message || "Upload failed."); setPreview(currentUrl || null); }
+    } catch { setError("Network error during upload."); setPreview(currentUrl || null); }
+    finally { setUploading(false); }
+  };
+
+  const handleRemove = async () => {
+    if (!invoiceId) { setPreview(null); onUploaded?.(null); return; }
+    setUploading(true);
+    try {
+      await fetch(`/api/finance/invoices/${invoiceId}/photo`, { method: "DELETE" });
+      setPreview(null); onUploaded?.(null);
+    } catch { setError("Failed to remove photo."); }
+    finally { setUploading(false); }
+  };
+
+  return (
+    <div className="flex items-start gap-4">
+      <div className="relative flex-shrink-0">
+        <div className={clsx(
+          "w-20 h-20 rounded-xl border-2 overflow-hidden flex items-center justify-center",
+          preview ? "border-brand-300 bg-gray-100" : "border-dashed border-surface-400 bg-surface-100"
+        )}>
+          {preview
+            ? <img src={preview} alt={name} className="w-full h-full object-cover" />
+            : <span className="text-xs font-bold text-gray-400 text-center px-1">{initials}</span>}
+          {uploading && (
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-xl">
+              <Loader2 className="w-5 h-5 animate-spin text-white" />
+            </div>
+          )}
+        </div>
+        {!readOnly && !uploading && (
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brand-600 hover:bg-brand-700 flex items-center justify-center shadow-md transition-colors"
+            title="Upload photo"
+          >
+            <Camera className="w-3.5 h-3.5 text-white" />
+          </button>
+        )}
+      </div>
+      <div className="flex-1 min-w-0 pt-1">
+        <p className="text-xs font-medium text-gray-700 mb-1">Invoice Photo / Receipt</p>
+        <p className="text-xs text-gray-400 mb-2">JPEG, PNG or WebP · max 5 MB</p>
+        {!readOnly && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-surface-200 hover:bg-surface-300 text-gray-700 transition-colors disabled:opacity-50"
+            >
+              <Upload className="w-3 h-3" />{preview ? "Change" : "Upload"}
+            </button>
+            {preview && (
+              <button
+                type="button"
+                onClick={handleRemove}
+                disabled={uploading}
+                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+              >
+                <X className="w-3 h-3" /> Remove
+              </button>
+            )}
+          </div>
+        )}
+        {error && <p className="mt-1.5 text-xs text-red-500">{error}</p>}
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }}
+      />
+    </div>
+  );
+}
+
+// ── Invoice photo thumbnail (table) ───────────────────────────────────────────
+
+function InvoiceThumbnail({ inv }: { inv: Invoice }) {
+  const initials = inv.invoice_number.replace(/[^a-zA-Z0-9]/g, "").slice(-3).toUpperCase() || "INV";
+  const isAR = inv.type === "accounts_receivable";
+  return (
+    <div className={clsx(
+      "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden border",
+      (inv as any).photo_url
+        ? "border-surface-300 bg-gray-100"
+        : isAR
+          ? "border-blue-200 bg-blue-50"
+          : "border-orange-200 bg-orange-50"
+    )}>
+      {(inv as any).photo_url
+        ? <img src={(inv as any).photo_url} alt={inv.invoice_number} className="w-full h-full object-cover" />
+        : <FileText className={clsx("w-4 h-4", isAR ? "text-blue-400" : "text-orange-400")} />}
+    </div>
+  );
+}
 
 // ── Shared drawer shell ────────────────────────────────────────────────────────
 
@@ -250,27 +383,19 @@ function InvoiceFormBody({ fields, errors, set, customers, suppliers, mode, firs
         {errors.type && <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.type}</p>}
       </div>
 
-      {/* Customer / Supplier based on type */}
+      {/* Customer / Supplier */}
       {(isAR || isAP) && (
         <div>
           <label className="label">{isAR ? "Customer" : "Supplier"} <span className="text-xs text-gray-400 font-normal">(optional)</span></label>
           {isAR ? (
-            <select
-              value={fields.customer_id}
-              onChange={(e) => set("customer_id", e.target.value)}
-              disabled={readOnly}
-              className={clsx("input", readOnly && "opacity-60 cursor-not-allowed")}
-            >
+            <select value={fields.customer_id} onChange={(e) => set("customer_id", e.target.value)}
+              disabled={readOnly} className={clsx("input", readOnly && "opacity-60 cursor-not-allowed")}>
               <option value="">— Select customer —</option>
               {customers.map((c) => <option key={c.id} value={c.id}>{c.customer_code} — {c.name}</option>)}
             </select>
           ) : (
-            <select
-              value={fields.supplier_id}
-              onChange={(e) => set("supplier_id", e.target.value)}
-              disabled={readOnly}
-              className={clsx("input", readOnly && "opacity-60 cursor-not-allowed")}
-            >
+            <select value={fields.supplier_id} onChange={(e) => set("supplier_id", e.target.value)}
+              disabled={readOnly} className={clsx("input", readOnly && "opacity-60 cursor-not-allowed")}>
               <option value="">— Select supplier —</option>
               {suppliers.map((s) => <option key={s.id} value={s.id}>{s.code} — {s.name}</option>)}
             </select>
@@ -291,8 +416,7 @@ function InvoiceFormBody({ fields, errors, set, customers, suppliers, mode, firs
         <div>
           <label className="label">Due Date <span className="text-red-500">*</span></label>
           <input type="date" value={fields.due_date} onChange={(e) => set("due_date", e.target.value)}
-            min={fields.issue_date}
-            disabled={readOnly}
+            min={fields.issue_date} disabled={readOnly}
             className={clsx("input", errors.due_date && "border-red-400", readOnly && "opacity-60 cursor-not-allowed")} />
           {errors.due_date && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.due_date}</p>}
         </div>
@@ -352,18 +476,20 @@ interface AddDrawerProps {
 }
 
 function AddInvoiceDrawer({ open, onClose, onSuccess, customers, suppliers }: AddDrawerProps) {
-  const { invoice } = useAuth();
+  const { invoiceAuth } = useAuth();
   const [fields, setFields] = useState<FormFields>(EMPTY_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle");
   const [serverError, setServerError] = useState("");
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);   // ← NEW
   const firstRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
       setFields({ ...EMPTY_FORM, issue_date: today() });
       setErrors({}); setSubmitStatus("idle"); setServerError("");
+      setPhotoPreview(null);                                                // ← NEW
       setTimeout(() => firstRef.current?.focus(), 120);
     }
   }, [open]);
@@ -406,13 +532,31 @@ function AddInvoiceDrawer({ open, onClose, onSuccess, customers, suppliers }: Ad
         }),
       });
       const data = await res.json();
-      if (data.success) { setSubmitStatus("success"); onSuccess(data.data); setTimeout(onClose, 900); }
-      else { setSubmitStatus("error"); setServerError(data.message || "Failed to create invoice."); }
+      if (!data.success) {
+        setSubmitStatus("error"); setServerError(data.message || "Failed to create invoice."); return;
+      }
+
+      let newInvoice: Invoice = data.data;
+
+      // ── Upload pending photo if user selected one before saving ──
+      if (photoPreview?.startsWith("blob:")) {
+        const blob = await fetch(photoPreview).then((r) => r.blob());
+        const file = new File([blob], `photo.${blob.type.split("/")[1] || "jpg"}`, { type: blob.type });
+        const fd = new FormData();
+        fd.append("photo", file);
+        const upRes = await fetch(`/api/finance/invoices/${newInvoice.id}/photo`, { method: "POST", body: fd });
+        const upData = await upRes.json();
+        if (upData.success) newInvoice = { ...newInvoice, photo_url: upData.data.photo_url } as Invoice;
+      }
+
+      setSubmitStatus("success");
+      onSuccess(newInvoice);
+      setTimeout(onClose, 900);
     } catch { setSubmitStatus("error"); setServerError("Network error."); }
     finally { setSubmitting(false); }
   };
 
-  const canCreate = invoice.canCreate();
+  const canCreate = invoiceAuth.canCreate();
 
   return (
     <Drawer open={open} onClose={onClose} title="New Invoice" subtitle="Create a draft AR or AP invoice" breadcrumb="New Invoice">
@@ -420,8 +564,19 @@ function AddInvoiceDrawer({ open, onClose, onSuccess, customers, suppliers }: Ad
         {!canCreate
           ? <AccessDenied action="create invoices" />
           : <>
-            <InvoiceFormBody fields={fields} errors={errors} set={set}
-              customers={customers} suppliers={suppliers} mode="add" firstRef={firstRef} />
+            {/* ── Photo upload ── */}
+            <PhotoUpload
+              name={fields.invoice_number || "New Invoice"}
+              currentUrl={photoPreview}
+              onUploaded={setPhotoPreview}
+            />
+            <div className="border-t border-surface-200 pt-5">
+              <InvoiceFormBody
+                fields={fields} errors={errors} set={set}
+                customers={customers} suppliers={suppliers}
+                mode="add" firstRef={firstRef}
+              />
+            </div>
             {serverError && (
               <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200">
                 <AlertCircle className="w-4 h-4 text-red-500 mt-0.5" />
@@ -456,14 +611,14 @@ interface EditDrawerProps {
 
 function EditInvoiceDrawer({ invoice: inv, onClose, onSuccess, customers, suppliers }: EditDrawerProps) {
   const open = !!inv;
-  const { invoice: invPerms, role } = useAuth();
+  const { invoiceAuth: invPerms } = useAuth();
   const [fields, setFields] = useState<FormFields>(EMPTY_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle");
   const [serverError, setServerError] = useState("");
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);   // ← NEW
 
-  // Status action state
   const [actionSubmitting, setActionSubmitting] = useState<string | null>(null);
   const [voidConfirm, setVoidConfirm] = useState(false);
 
@@ -481,6 +636,7 @@ function EditInvoiceDrawer({ invoice: inv, onClose, onSuccess, customers, suppli
         supplier_id: inv.supplier_id || "",
         notes: inv.notes || "",
       });
+      setPhotoUrl((inv as any).photo_url || null);                         // ← NEW
       setErrors({}); setSubmitStatus("idle"); setServerError(""); setVoidConfirm(false);
     }
   }, [inv]);
@@ -524,8 +680,25 @@ function EditInvoiceDrawer({ invoice: inv, onClose, onSuccess, customers, suppli
         }),
       });
       const data = await res.json();
-      if (data.success) { setSubmitStatus("success"); onSuccess(data.data); setTimeout(onClose, 900); }
-      else { setSubmitStatus("error"); setServerError(data.message || "Failed to update invoice."); }
+
+      // ── Upload pending blob photo if not yet uploaded ──────────────
+      if (photoUrl?.startsWith("blob:")) {
+        const blob = await fetch(photoUrl).then((r) => r.blob());
+        const file = new File([blob], `photo.${blob.type.split("/")[1] || "jpg"}`, { type: blob.type });
+        const fd = new FormData();
+        fd.append("photo", file);
+        const upRes = await fetch(`/api/finance/invoices/${inv.id}/photo`, { method: "POST", body: fd });
+        const upData = await upRes.json();
+        if (upData.success) setPhotoUrl(upData.data.photo_url);
+      }
+
+      if (data.success) {
+        setSubmitStatus("success");
+        onSuccess({ ...data.data, photo_url: photoUrl } as Invoice);
+        setTimeout(onClose, 900);
+      } else {
+        setSubmitStatus("error"); setServerError(data.message || "Failed to update invoice.");
+      }
     } catch { setSubmitStatus("error"); setServerError("Network error."); }
     finally { setSubmitting(false); }
   };
@@ -539,7 +712,7 @@ function EditInvoiceDrawer({ invoice: inv, onClose, onSuccess, customers, suppli
         body: JSON.stringify({ status: targetStatus }),
       });
       const data = await res.json();
-      if (data.success) { onSuccess(data.data); setTimeout(onClose, 400); }
+      if (data.success) { onSuccess({ ...data.data, photo_url: photoUrl } as Invoice); setTimeout(onClose, 400); }
       else setServerError(data.message || "Status update failed.");
     } catch { setServerError("Network error."); }
     finally { setActionSubmitting(null); setVoidConfirm(false); }
@@ -573,15 +746,25 @@ function EditInvoiceDrawer({ invoice: inv, onClose, onSuccess, customers, suppli
           </div>
         )}
 
-        {/* RBAC gate on editing */}
         {!canEdit && isEditable && <AccessDenied action="edit invoices" />}
 
-        <InvoiceFormBody
-          fields={fields} errors={errors} set={set}
-          customers={customers} suppliers={suppliers}
-          mode="edit"
+        {/* ── Photo upload ── */}
+        <PhotoUpload
+          invoiceId={inv?.id}
+          currentUrl={photoUrl}
+          name={inv?.invoice_number || "Invoice"}
+          onUploaded={setPhotoUrl}
           readOnly={!canEdit || !isEditable}
         />
+
+        <div className="border-t border-surface-200 pt-5">
+          <InvoiceFormBody
+            fields={fields} errors={errors} set={set}
+            customers={customers} suppliers={suppliers}
+            mode="edit"
+            readOnly={!canEdit || !isEditable}
+          />
+        </div>
 
         {/* Status actions */}
         {availableActions.length > 0 && (
@@ -620,8 +803,7 @@ function EditInvoiceDrawer({ invoice: inv, onClose, onSuccess, customers, suppli
                           >
                             {actionSubmitting === "cancelled"
                               ? <><Loader2 className="w-3 h-3 animate-spin" /> Voiding…</>
-                              : <><Ban className="w-3 h-3" /> Yes, void it</>
-                            }
+                              : <><Ban className="w-3 h-3" /> Yes, void it</>}
                           </button>
                           <button onClick={() => setVoidConfirm(false)} className="btn-secondary text-xs py-1.5 px-3">
                             Cancel
@@ -653,8 +835,7 @@ function EditInvoiceDrawer({ invoice: inv, onClose, onSuccess, customers, suppli
                     ? <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
                     : !hasAccess
                       ? <span className="text-xs text-gray-400 flex items-center gap-1"><Lock className="w-3 h-3" /> Restricted</span>
-                      : <ChevronRight className="w-4 h-4 text-gray-400" />
-                  }
+                      : <ChevronRight className="w-4 h-4 text-gray-400" />}
                 </button>
               );
             })}
@@ -685,39 +866,12 @@ function EditInvoiceDrawer({ invoice: inv, onClose, onSuccess, customers, suppli
   );
 }
 
-// ── Summary cards ──────────────────────────────────────────────────────────────
-
-function SummaryCards({ invoices }: { invoices: Invoice[] }) {
-  const total = invoices.reduce((s, i) => s + i.total_amount, 0);
-  const paid = invoices.filter((i) => i.status === "paid").reduce((s, i) => s + i.total_amount, 0);
-  const overdue = invoices.filter((i) => i.status === "overdue").reduce((s, i) => s + i.total_amount, 0);
-  const pending = invoices.filter((i) => ["draft", "sent", "approved"].includes(i.status)).reduce((s, i) => s + i.total_amount, 0);
-
-  return (
-    <div className="grid grid-cols-4 gap-3 mb-4">
-      {[
-        { label: "Total Value", value: total, color: "text-gray-900", bg: "bg-white" },
-        { label: "Collected", value: paid, color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
-        { label: "Outstanding", value: pending, color: "text-blue-700", bg: "bg-blue-50 border-blue-200" },
-        { label: "Overdue", value: overdue, color: "text-red-600", bg: "bg-red-50 border-red-200" },
-      ].map((item) => (
-        <div key={item.label} className={clsx("rounded-xl border px-4 py-3", item.bg)}>
-          <p className="text-xs font-medium text-gray-500">{item.label}</p>
-          <p className={clsx("text-lg font-bold tabular-nums mt-1", item.color)}>
-            {formatCurrency(Number(item.value) || 0)}
-          </p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
 const STATUSES = ["", "draft", "sent", "approved", "paid", "overdue", "cancelled"];
 
 export default function InvoicesPage() {
-  const { invoice: invPerms, user, loading: authLoading } = useAuth();
+  const { invoiceAuth: invPerms, user, loading: authLoading } = useAuth();
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -726,7 +880,6 @@ export default function InvoicesPage() {
   const [total, setTotal] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
   const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
-
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -740,10 +893,13 @@ export default function InvoicesPage() {
     fetch(`/api/finance/invoices?${p}`)
       .then((r) => r.json())
       .then((res) => {
-        if (res.success) { setInvoices(res.data); setTotal(res.pagination?.totalCount || 0); }
+        if (res.success) {
+          setInvoices(res.data); setTotal(res.pagination?.totalCount || 0);
+        }
       })
       .finally(() => setLoading(false));
-  }, [statusFilter, typeFilter, search]);
+    }, [statusFilter, typeFilter, search]);
+    console.log("invoices: ", invoices)
 
   useEffect(() => { load(); }, [load]);
 
@@ -755,7 +911,6 @@ export default function InvoicesPage() {
   const handleAdded = (inv: Invoice) => { setInvoices((p) => [inv, ...p]); setTotal((p) => p + 1); };
   const handleUpdated = (inv: Invoice) => { setInvoices((p) => p.map((i) => i.id === inv.id ? inv : i)); };
 
-  // Simple summary computation
   const summary = {
     total: invoices.reduce((s, i) => s + i.total_amount, 0),
     paid: invoices.filter((i) => i.status === "paid").reduce((s, i) => s + i.total_amount, 0),
@@ -781,42 +936,32 @@ export default function InvoicesPage() {
       />
 
       <PageWrapper>
-        {/* Auth info strip */}
+        {/* Auth strip */}
         {!authLoading && user && (
           <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-surface-200 border border-surface-300 text-xs text-gray-500">
             <span className="font-medium text-gray-700">{user.full_name}</span>
             <span>·</span>
             <span className="capitalize">{user.role.replace(/_/g, " ")}</span>
             <span>·</span>
-            <span className={invPerms.canCreate() ? "text-emerald-600" : "text-gray-400"}>
-              {invPerms.canCreate() ? "✓ Can create" : "✗ No create"}
-            </span>
-            <span className={invPerms.canEdit() ? "text-emerald-600" : "text-gray-400"}>
-              {invPerms.canEdit() ? "✓ Can edit" : "✗ No edit"}
-            </span>
-            <span className={invPerms.canApprove() ? "text-emerald-600" : "text-gray-400"}>
-              {invPerms.canApprove() ? "✓ Can approve" : "✗ No approve"}
-            </span>
-            <span className={invPerms.canVoid() ? "text-emerald-600" : "text-gray-400"}>
-              {invPerms.canVoid() ? "✓ Can void" : "✗ No void"}
-            </span>
+            <span className={invPerms.canCreate() ? "text-emerald-600" : "text-gray-400"}>{invPerms.canCreate() ? "✓ Can create" : "✗ No create"}</span>
+            <span className={invPerms.canEdit() ? "text-emerald-600" : "text-gray-400"}>{invPerms.canEdit() ? "✓ Can edit" : "✗ No edit"}</span>
+            <span className={invPerms.canApprove() ? "text-emerald-600" : "text-gray-400"}>{invPerms.canApprove() ? "✓ Can approve" : "✗ No approve"}</span>
+            <span className={invPerms.canVoid() ? "text-emerald-600" : "text-gray-400"}>{invPerms.canVoid() ? "✓ Can void" : "✗ No void"}</span>
           </div>
         )}
 
-        {/* Summary */}
+        {/* Summary cards */}
         {!loading && invoices.length > 0 && (
           <div className="grid grid-cols-4 gap-3 mb-4">
-            {[
+            {([
               { label: "Total Value", value: summary.total, color: "text-gray-900", bg: "bg-white border-surface-300" },
               { label: "Collected", value: summary.paid, color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
               { label: "Outstanding", value: summary.pending, color: "text-blue-700", bg: "bg-blue-50 border-blue-200" },
               { label: "Overdue", value: summary.overdue, color: "text-red-600", bg: "bg-red-50 border-red-200" },
-            ].map((item) => (
+            ] as const).map((item) => (
               <div key={item.label} className={clsx("rounded-xl border px-4 py-3", item.bg)}>
                 <p className="text-xs font-medium text-gray-500">{item.label}</p>
-                <p className={clsx("text-lg font-bold tabular-nums mt-1", item.color)}>
-                  {formatCurrency(item.value)}
-                </p>
+                <p className={clsx("text-lg font-bold tabular-nums mt-1", item.color)}>{formatCurrency(item.value)}</p>
               </div>
             ))}
           </div>
@@ -888,7 +1033,13 @@ export default function InvoicesPage() {
                         onClick={() => setEditInvoice(inv)}
                         className="border-b border-surface-200 hover:bg-surface-50 transition-colors cursor-pointer group"
                       >
-                        <td className="px-4 py-3 font-mono text-xs font-medium text-brand-700">{inv.invoice_number}</td>
+                        {/* ── Invoice # with thumbnail ── */}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <InvoiceThumbnail inv={inv} />
+                            <span className="font-mono text-xs font-medium text-brand-700">{inv.invoice_number}</span>
+                          </div>
+                        </td>
                         <td className="px-4 py-3">
                           <span className={clsx(
                             "badge text-xs",

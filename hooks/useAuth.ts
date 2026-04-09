@@ -163,7 +163,7 @@ export function useAuth() {
             approve: (mod: Module) => !!role && canApprove(role, mod),
             full: (mod: Module) => !!role && hasPermission(role, mod, "full"),
         },
-        invoice: {
+        invoiceAuth: {
             canCreate: () => !!role && (hasPermission(role, "finance", "full") || hasPermission(role, "finance", "create")),
             canEdit: () => !!role && (hasPermission(role, "finance", "full") || hasPermission(role, "finance", "edit")),
             canApprove: () => !!role && (hasPermission(role, "finance", "full") || hasPermission(role, "finance", "approve")),

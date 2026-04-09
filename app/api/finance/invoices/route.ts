@@ -15,7 +15,8 @@ export async function GET(req: NextRequest) {
 
     let query = supabase
       .from("invoices")
-      .select("*, customers(id, name, customer_code)", { count: "exact" })
+      .select("*")
+      // .select("*, customers(id, name, customer_code)", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(from, to);
 

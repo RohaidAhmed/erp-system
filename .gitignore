@@ -1,8 +1,10 @@
 node_modules/
 .next/
-.env*
+.env.local
+.env
 .venv/*
 to_claud/
 scripts/
 .venv/
 .vscode/
+supabase/
