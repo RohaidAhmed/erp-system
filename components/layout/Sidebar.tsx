@@ -30,7 +30,6 @@ const FULL_NAV = [
     label: "Human Resources", icon: Users,
     children: [
       { label: "Employees", href: "/hr/employees", icon: UserCircle },
-      {label: "Attendance", href: "/hr/attendance", icon: UserCircle},
       { label: "Payroll", href: "/hr/payroll", icon: DollarSign },
       { label: "Leave", href: "/hr/leave", icon: Calendar },
       { label: "Attendance", href: "/hr/attendance", icon: Clock },
