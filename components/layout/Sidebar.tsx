@@ -8,6 +8,7 @@ import {
   TrendingUp, Cog, BarChart3, ChevronRight, Building2, LogOut,
   FileText, Truck, UserCircle, Factory, ClipboardList, Settings,
   Clock, Calendar, Loader2,
+  PackageCheck,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useAuth } from "@/hooks/useAuth";
@@ -39,6 +40,7 @@ const FULL_NAV = [
     label: "Inventory", icon: Package,
     children: [
       { label: "Products", href: "/inventory/products", icon: Package },
+      {label: "Movements", href: "/inventory/movements", icon: PackageCheck },
       { label: "Warehouses", href: "/inventory/warehouses", icon: Building2 },
     ],
   },
